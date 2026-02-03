@@ -556,6 +556,22 @@ class Page:
                     return True
         return False
 
+    def _call_action_method(self, action: "ActionCore", method_name: str) -> None:
+        method = getattr(action, method_name)
+        try:
+            method()
+        except ValueError as exc:
+            if "height and width must be > 0" not in str(exc):
+                raise
+            if not getattr(action, "_invalid_image_size_warned", False):
+                log.warning(
+                    "Action %s (%s) skipped %s due to invalid image size.",
+                    action.action_name,
+                    action.action_id,
+                    method_name,
+                )
+                setattr(action, "_invalid_image_size_warned", True)
+
     @log.catch
     def initialize_actions(self):
         for action in self.get_all_actions():
@@ -563,8 +579,8 @@ class Page:
                 action.on_ready_called = True
                 action.load_event_overrides()
                 action.load_initial_generative_ui()
-                action.on_ready()
-                action.on_update()
+                self._call_action_method(action, "on_ready")
+                self._call_action_method(action, "on_update")
 
     def clear_action_objects(self):
         for input_type in self.action_objects:
