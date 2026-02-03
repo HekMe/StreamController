@@ -1661,14 +1661,30 @@ class ControllerInputState:
     def update(self) -> None:
         if self.controller_input.state == self.state:
             self.controller_input.update()
-    
+
+    def _call_action_method(self, action: "ActionCore", method_name: str) -> None:
+        method = getattr(action, method_name)
+        try:
+            method()
+        except ValueError as exc:
+            if "height and width must be > 0" not in str(exc):
+                raise
+            if not getattr(action, "_invalid_image_size_warned", False):
+                log.warning(
+                    "Action %s (%s) skipped %s due to invalid image size.",
+                    action.action_name,
+                    action.action_id,
+                    method_name,
+                )
+                setattr(action, "_invalid_image_size_warned", True)
+
     def own_actions_update(self) -> None:
         for action in self.get_own_actions():
             if not isinstance(action, ActionCore):
                 continue
             if not action.on_ready_called:
                 continue
-            action.on_update()
+            self._call_action_method(action, "on_update")
 
     @log.catch
     def own_actions_tick(self) -> None:
@@ -1677,7 +1693,7 @@ class ControllerInputState:
                 continue
             if not action.on_ready_called:
                 continue
-            action.on_tick()
+            self._call_action_method(action, "on_tick")
 
     @log.catch
     def own_actions_event_callback(self, event: InputEvent, data: dict = None, show_notifications: bool = False) -> None:
