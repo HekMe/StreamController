@@ -60,8 +60,12 @@ class ImageLayer:
         Returns:
             tuple[PIL.Image.Image, tuple[int, int]]: A tuple containing the resized image and its position (x, y).
         """
-        new_width = int(base_size[0] * self.size)
-        new_height = int(base_size[1] * self.size)
+        if base_size[0] <= 0 or base_size[1] <= 0:
+            log.warning(f"Invalid base_size for image transform: {base_size}")
+            return self.image.copy(), (0, 0)
+
+        new_width = max(1, int(base_size[0] * self.size))
+        new_height = max(1, int(base_size[1] * self.size))
         scaled_image = self.image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
         x_offset = (base_size[0] - new_width) // 2
