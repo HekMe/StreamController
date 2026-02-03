@@ -493,7 +493,7 @@ class DeckController:
             api_page_path = gl.page_manager.find_matching_page_path(api_page_path)
 
         if api_page_path is None:
-            default_page_path = gl.page_manager.get_default_page(self.deck.get_serial_number())
+            default_page_path = gl.page_manager.get_or_create_default_page(self.deck.get_serial_number())
         else:
             default_page_path = api_page_path
 
@@ -1454,6 +1454,17 @@ class LayoutManager:
                 layout.fill_mode = "contain"
         if layout.size is None:
             layout.size = 1
+        if layout.size <= 0:
+            min_size = 1
+            try:
+                image_size = self.controller_input.get_image_size()
+                if image_size:
+                    min_dimension = min(image_size)
+                    if min_dimension and min_dimension > 0:
+                        min_size = 1 / min_dimension
+            except Exception:
+                pass
+            layout.size = min_size
 
         return layout
     
@@ -2226,9 +2237,12 @@ class ControllerKey(ControllerInput):
                                 fps = state_dict.get("media", {}).get("fps", 30),
                             )) # Videos always update
 
+                media_size = state_dict.get("media", {}).get("size")
+                if media_size is not None and media_size <= 0:
+                    media_size = None
                 layout = ImageLayout(
                     fill_mode=state_dict.get("media", {}).get("fill-mode"),
-                    size=state_dict.get("media", {}).get("size"),
+                    size=media_size,
                     valign=state_dict.get("media", {}).get("valign"),
                     halign=state_dict.get("media", {}).get("halign"),
                 )
@@ -2363,9 +2377,38 @@ class ControllerTouchScreen(ControllerInput):
             return
         
         active_state = self.get_active_state()
+        if event_type in (TouchscreenEventType.SHORT, TouchscreenEventType.LONG, TouchscreenEventType.DRAG):
+            touch_x = value.get("x")
+            touch_out_x = value.get("x_out", touch_x)
+            dial = self.get_dial_for_touch_x(touch_x)
+            if dial is not None:
+                dial_active_state = dial.get_active_state()
+                if dial_active_state is not None:
+                    if event_type == TouchscreenEventType.DRAG:
+                        if touch_x > touch_out_x:
+                            dial_active_state.own_actions_event_callback_threaded(
+                                Input.Touchscreen.Events.DRAG_LEFT
+                            )
+                        else:
+                            dial_active_state.own_actions_event_callback_threaded(
+                                Input.Touchscreen.Events.DRAG_RIGHT
+                            )
+                    else:
+                        event = Input.Dial.Events.SHORT_TOUCH_PRESS
+                        if event_type == TouchscreenEventType.LONG:
+                            event = Input.Dial.Events.LONG_TOUCH_PRESS
+
+                        dial_active_state.own_actions_event_callback_threaded(
+                            event,
+                            data={"x": touch_x, "y": value.get("y")},
+                            show_notifications=True
+                        )
+
         if event_type == TouchscreenEventType.DRAG:
             # Check if from left to right or the other way
-            if value['x'] > value['x_out']:
+            touch_x = value.get("x")
+            touch_out_x = value.get("x_out", touch_x)
+            if touch_x > touch_out_x:
                 active_state.own_actions_event_callback_threaded(
                     Input.Touchscreen.Events.DRAG_LEFT
                 )
@@ -2373,24 +2416,6 @@ class ControllerTouchScreen(ControllerInput):
                 active_state.own_actions_event_callback_threaded(
                     Input.Touchscreen.Events.DRAG_RIGHT
                 )
-
-
-        #TODO get matching actions from the dials
-        elif event_type in (TouchscreenEventType.SHORT, TouchscreenEventType.LONG):
-            dial = self.get_dial_for_touch_x(value['x'])
-            if dial is not None:
-                dial_active_state = dial.get_active_state()
-                if dial_active_state is not None:
-
-                    event = Input.Dial.Events.SHORT_TOUCH_PRESS
-                    if event_type == TouchscreenEventType.LONG:
-                        event = Input.Dial.Events.LONG_TOUCH_PRESS
-
-                    dial_active_state.own_actions_event_callback_threaded(
-                        event,
-                        data={"x": value['x'], "y": value['y']},
-                        show_notifications=True
-                    )
 
     def get_dial_for_touch_x(self, touch_x: float) -> "ControllerDial":
         screen_width = self.deck_controller.get_touchscreen_image_size()[0]
@@ -2531,9 +2556,12 @@ class ControllerDial(ControllerInput):
                             fps = state_dict.get("media", {}).get("fps", 30),
                         )) # Videos always update
 
+            media_size = state_dict.get("media", {}).get("size")
+            if media_size is not None and media_size <= 0:
+                media_size = None
             layout = ImageLayout(
                 fill_mode=state_dict.get("media", {}).get("fill-mode"),
-                size=state_dict.get("media", {}).get("size"),
+                size=media_size,
                 valign=state_dict.get("media", {}).get("valign"),
                 halign=state_dict.get("media", {}).get("halign"),
             )

@@ -63,6 +63,28 @@ To install the head of main as a Flatpak just run the following command:
 bash -c "$(wget -O - https://raw.githubusercontent.com/StreamController/StreamController/main/flatpak/install.sh)"
 ```
 
+#### Local build (no package manager)
+
+If you want to build and run StreamController locally without using a package manager, you can use a Python virtual environment and the source tree:
+
+```sh
+git clone https://github.com/StreamController/StreamController.git
+cd StreamController
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python main.py
+```
+
+> Note: StreamController depends on system libraries (GTK/Adwaita, libusb, etc.). If the app fails to start due to missing system dependencies, install those with your distro tooling or follow the docs for your platform.
+
+> Note (CIFS mounts): Python virtual environments may fail on CIFS because `venv` creates symlinks. If your repo lives on a CIFS share, prefer creating the venv on a local filesystem. If you must use CIFS, ensure the share is mounted with symlink support (for example, add `mfsymlinks` and a modern SMB `vers` in `/etc/fstab`). Example:
+>
+> ```fstab
+> //server/share  /projects  cifs  credentials=/etc/cifs-creds,uid=1000,gid=1000,vers=3.0,mfsymlinks  0  0
+> ```
+
 #### Unofficial Packages
 
 The following packages are functional but unofficial and maintained by our community:

@@ -17,6 +17,7 @@ import dataclasses
 import datetime
 import gc
 import os
+import re
 import shutil
 import json
 import zipfile
@@ -152,6 +153,53 @@ class PageManagerBackend:
             return page_path
 
         return None
+
+    def get_or_create_default_page(self, deck_serial_number: str) -> str | None:
+        default_page = self.get_default_page(deck_serial_number)
+        if default_page:
+            serials_using_page = self.get_serial_numbers_from_page(default_page)
+            if len(serials_using_page) > 1:
+                cloned_page_path = self._create_deck_profile_page(deck_serial_number, default_page)
+                if cloned_page_path:
+                    self.set_default_page(deck_serial_number, cloned_page_path)
+                    return cloned_page_path
+            return default_page
+
+        pages = self.get_pages()
+        template_path = pages[0] if pages else None
+        new_page_path = self._create_deck_profile_page(deck_serial_number, template_path)
+        if new_page_path is None:
+            return None
+
+        self.set_default_page(deck_serial_number, new_page_path)
+        return new_page_path
+
+    def _create_deck_profile_page(self, deck_serial_number: str, template_path: str | None) -> str | None:
+        os.makedirs(self.PAGE_PATH, exist_ok=True)
+        new_page_path = self._get_unique_deck_page_path(deck_serial_number)
+
+        if template_path and os.path.isfile(template_path):
+            shutil.copy2(template_path, new_page_path)
+        else:
+            with open(new_page_path, "w") as f:
+                json.dump({}, f, indent=4)
+
+        return new_page_path
+
+    def _get_unique_deck_page_path(self, deck_serial_number: str) -> str:
+        safe_serial = re.sub(r"[^a-zA-Z0-9_-]+", "-", deck_serial_number).strip("-_") or "deck"
+        base_name = f"{safe_serial}-profile"
+
+        candidate = os.path.join(self.PAGE_PATH, f"{base_name}.json")
+        if not os.path.exists(candidate):
+            return candidate
+
+        index = 1
+        while True:
+            candidate = os.path.join(self.PAGE_PATH, f"{base_name}-{index}.json")
+            if not os.path.exists(candidate):
+                return candidate
+            index += 1
 
     def set_default_page(self, deck_serial_number: str, path: str):
         page_settings = self.settings_manager.load_settings_from_file(self.PAGE_SETTINGS_PATH)

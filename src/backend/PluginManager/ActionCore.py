@@ -186,6 +186,9 @@ class ActionCore(rpyc.Service):
         else:
             input_state.set_image(None, update=False)
 
+        if size is not None and size <= 0:
+            size = None
+
         self.get_state().layout_manager.set_action_layout(ImageLayout(
             valign=valign,
             halign=halign,
