@@ -2237,9 +2237,12 @@ class ControllerKey(ControllerInput):
                                 fps = state_dict.get("media", {}).get("fps", 30),
                             )) # Videos always update
 
+                media_size = state_dict.get("media", {}).get("size")
+                if media_size is not None and media_size <= 0:
+                    media_size = None
                 layout = ImageLayout(
                     fill_mode=state_dict.get("media", {}).get("fill-mode"),
-                    size=state_dict.get("media", {}).get("size"),
+                    size=media_size,
                     valign=state_dict.get("media", {}).get("valign"),
                     halign=state_dict.get("media", {}).get("halign"),
                 )
@@ -2553,9 +2556,12 @@ class ControllerDial(ControllerInput):
                             fps = state_dict.get("media", {}).get("fps", 30),
                         )) # Videos always update
 
+            media_size = state_dict.get("media", {}).get("size")
+            if media_size is not None and media_size <= 0:
+                media_size = None
             layout = ImageLayout(
                 fill_mode=state_dict.get("media", {}).get("fill-mode"),
-                size=state_dict.get("media", {}).get("size"),
+                size=media_size,
                 valign=state_dict.get("media", {}).get("valign"),
                 halign=state_dict.get("media", {}).get("halign"),
             )
