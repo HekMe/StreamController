@@ -396,16 +396,25 @@ class ActionCore(rpyc.Service):
         return self.plugin_base.locale_manager.get(key, fallback)
     
     def has_label_controls(self):
+        state = self.get_state()
+        if state is None or state.action_permission_manager is None:
+            return []
         own_action_index = self.get_own_action_index()
-        return [own_action_index == i for i in self.get_state().action_permission_manager.get_label_control_indices()]
+        return [own_action_index == i for i in state.action_permission_manager.get_label_control_indices()]
     
     def has_label_control(self, label_index) -> list[bool]:
         #TODO: Might require performance improvements
-        return self.get_state().action_permission_manager.get_label_control_index(label_index) == self.get_own_action_index()
+        state = self.get_state()
+        if state is None or state.action_permission_manager is None:
+            return False
+        return state.action_permission_manager.get_label_control_index(label_index) == self.get_own_action_index()
 
     def has_image_control(self):
         #TODO: Might require performance improvements
-        image_control_index = self.get_state().action_permission_manager.get_image_control_index()
+        state = self.get_state()
+        if state is None or state.action_permission_manager is None:
+            return False
+        image_control_index = state.action_permission_manager.get_image_control_index()
         return image_control_index == self.get_own_action_index()
 
 
@@ -421,7 +430,10 @@ class ActionCore(rpyc.Service):
     
     def has_background_control(self):
         #TODO: Might require performance improvements
-        background_control_index = self.get_state().action_permission_manager.get_background_control_index()
+        state = self.get_state()
+        if state is None or state.action_permission_manager is None:
+            return False
+        background_control_index = state.action_permission_manager.get_background_control_index()
         return background_control_index == self.get_own_action_index()
     
     def get_is_present(self):
