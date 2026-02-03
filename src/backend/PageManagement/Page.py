@@ -874,6 +874,8 @@ class Page:
         return self._get_dict_value([identifier.input_type, identifier.json_identifier, "states", str(state), "media", "size"])
 
     def set_media_size(self, identifier: InputIdentifier, state: int, size: float, update: bool = True) -> None:
+        if size is not None and size <= 0:
+            size = None
         for key_state in self.get_controller_input_states(identifier, state):
             key_state.layout_manager.page_layout.size = size
 
