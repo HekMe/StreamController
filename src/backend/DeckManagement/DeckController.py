@@ -54,7 +54,7 @@ from gi.repository import GLib
 from src.Signals import Signals
 
 # Import typing
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Optional, cast
 
 from src.windows.mainWindow.elements.KeyGrid import KeyButton, KeyGrid
 from src.backend.PluginManager.ActionCore import ActionCore
@@ -313,6 +313,8 @@ class DeckController:
         self.deck = deck
         self.deck.open(self.deck_manager.beta_resume_mode)
 
+        self._serial_number: Optional[str] = None
+
         rotation = self.get_deck_settings().get("rotation", 0)
         self.deck: BetterDeck = BetterDeck(deck, rotation)
 
@@ -408,7 +410,16 @@ class DeckController:
 
     @lru_cache(maxsize=None)
     def serial_number(self) -> str:
-        return self.deck.get_serial_number()
+        if self._serial_number is None:
+            try:
+                self._serial_number = self.deck.get_serial_number()
+            except Exception as e:
+                self._serial_number = f"unknown-deck-{id(self.deck)}"
+                log.error(
+                    f"Failed to read deck serial number. Using fallback id {self._serial_number}. "
+                    f"Error: {e}"
+                )
+        return self._serial_number
     
     def is_visual(self) -> bool:
         return self.deck.is_visual()
@@ -493,7 +504,7 @@ class DeckController:
             api_page_path = gl.page_manager.find_matching_page_path(api_page_path)
 
         if api_page_path is None:
-            default_page_path = gl.page_manager.get_or_create_default_page(self.deck.get_serial_number())
+            default_page_path = gl.page_manager.get_or_create_default_page(self.serial_number())
         else:
             default_page_path = api_page_path
 
@@ -701,7 +712,7 @@ class DeckController:
             self.clear()
             return
 
-        log.info(f"Loading page {page.get_name()} on deck {self.deck.get_serial_number()}")
+        log.info(f"Loading page {page.get_name()} on deck {self.serial_number()}")
 
         # Stop queued tasks
         self.clear_media_player_tasks()
@@ -732,7 +743,7 @@ class DeckController:
         # Notify plugin actions
         gl.signal_manager.trigger_signal(Signals.ChangePage, self, old_path, self.active_page.json_path)
 
-        log.info(f"Loaded page {page.get_name()} on deck {self.deck.get_serial_number()}")
+        log.info(f"Loaded page {page.get_name()} on deck {self.serial_number()}")
         gc.collect()
 
     def set_brightness(self, value):
@@ -811,7 +822,7 @@ class DeckController:
     def get_deck_settings(self):
         if not self.get_alive():
             return {}
-        return gl.settings_manager.get_deck_settings(self.deck.get_serial_number())
+        return gl.settings_manager.get_deck_settings(self.serial_number())
     
     def get_own_deck_stack_child(self) -> "DeckStackChild":
         # Why not just lru_cache this? Because this would also cache the None that gets returned while the ui is still loading
@@ -819,7 +830,7 @@ class DeckController:
             return self.own_deck_stack_child
         
         if not recursive_hasattr(gl, "app.main_win.leftArea.deck_stack"): return
-        serial_number = self.deck.get_serial_number()
+        serial_number = self.serial_number()
         deck_stack = gl.app.main_win.leftArea.deck_stack
         deck_stack_child = deck_stack.get_child_by_name(serial_number)
         if deck_stack_child == None:
